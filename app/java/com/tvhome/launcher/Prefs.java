@@ -62,25 +62,6 @@ public final class Prefs {
         sp.edit().putLong("wat", 0L).apply();
     }
 
-    // ------------------------------------------------------------------ cricket ticker
-
-    public boolean cricketOn() {
-        return sp.getBoolean("cricketOn", true);
-    }
-
-    public void setCricketOn(boolean on) {
-        sp.edit().putBoolean("cricketOn", on).apply();
-    }
-
-    /** 0 = live matches only, 1 = all matches (recent, finished and upcoming). */
-    public int cricketFeed() {
-        return sp.getInt("cricketFeed", 0);
-    }
-
-    public void setCricketFeed(int feed) {
-        sp.edit().putInt("cricketFeed", feed).apply();
-    }
-
     // ------------------------------------------------------------------ focus memory
 
     /** "row:index" of the last focused home tile ("fav", "sec" or "quick"). */

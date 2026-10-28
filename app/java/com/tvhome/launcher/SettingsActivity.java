@@ -14,7 +14,7 @@ import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Weather city, tile size, corners, cricket ticker, dimmer, network status and system entry. */
+/** Weather city, tile size, corners, dimmer, network status and system entry. */
 public class SettingsActivity extends Activity {
 
     private static final String[][] CITIES = {
@@ -39,8 +39,6 @@ public class SettingsActivity extends Activity {
     private LinearLayout cityRow;
     private LinearLayout sizeRow;
     private LinearLayout cornerRow;
-    private LinearLayout tickerToggleRow;
-    private LinearLayout feedRow;
     private LinearLayout dimRow;
     private View dimPreviewScrim;
     private TextView netStatus;
@@ -54,14 +52,12 @@ public class SettingsActivity extends Activity {
         cityRow = findViewById(R.id.cityRow);
         sizeRow = findViewById(R.id.sizeRow);
         cornerRow = findViewById(R.id.cornerRow);
-        tickerToggleRow = findViewById(R.id.tickerToggleRow);
-        feedRow = findViewById(R.id.feedRow);
         dimRow = findViewById(R.id.dimRow);
         dimPreviewScrim = findViewById(R.id.dimPreviewScrim);
         netStatus = findViewById(R.id.netStatus);
 
         TextView sub = findViewById(R.id.sub);
-        sub.setText("Weather, tile style, cricket ticker, dimmer and system access");
+        sub.setText("Weather, tile style, dimmer and system access");
 
         ImageView previewWall = findViewById(R.id.dimPreviewWall);
         previewWall.setImageBitmap(WallpaperStore.load(this, prefs.wallpaperKey(), 640));
@@ -70,8 +66,6 @@ public class SettingsActivity extends Activity {
         buildCities();
         buildSizeChips();
         buildCornerChips();
-        buildTickerChips();
-        buildFeedChips();
         buildDimChips();
 
         TextView refresh = findViewById(R.id.btnRefresh);
@@ -133,46 +127,6 @@ public class SettingsActivity extends Activity {
             return true;
         }
         return super.dispatchKeyEvent(event);
-    }
-
-    // ------------------------------------------------------------------ cricket ticker
-
-    private void buildTickerChips() {
-        tickerToggleRow.removeAllViews();
-        boolean on = prefs.cricketOn();
-        TextView chipOn = settingsChip(on ? "● Ticker on" : "Ticker on", on);
-        chipOn.setOnClickListener(v -> {
-            prefs.setCricketOn(true);
-            buildTickerChips();
-            Toast.makeText(this, "Cricket ticker on", Toast.LENGTH_SHORT).show();
-        });
-        TextView chipOff = settingsChip(!on ? "● Ticker off" : "Ticker off", !on);
-        chipOff.setOnClickListener(v -> {
-            prefs.setCricketOn(false);
-            buildTickerChips();
-            Toast.makeText(this, "Cricket ticker off", Toast.LENGTH_SHORT).show();
-        });
-        tickerToggleRow.addView(chipOn);
-        tickerToggleRow.addView(chipOff);
-    }
-
-    private void buildFeedChips() {
-        feedRow.removeAllViews();
-        int feed = prefs.cricketFeed();
-        TextView chipLive = settingsChip(feed == 0 ? "● Live matches" : "Live matches", feed == 0);
-        chipLive.setOnClickListener(v -> {
-            prefs.setCricketFeed(0);
-            buildFeedChips();
-            Toast.makeText(this, "Feed: live matches only", Toast.LENGTH_SHORT).show();
-        });
-        TextView chipAll = settingsChip(feed == 1 ? "● All matches" : "All matches", feed == 1);
-        chipAll.setOnClickListener(v -> {
-            prefs.setCricketFeed(1);
-            buildFeedChips();
-            Toast.makeText(this, "Feed: all matches", Toast.LENGTH_SHORT).show();
-        });
-        feedRow.addView(chipLive);
-        feedRow.addView(chipAll);
     }
 
     // ------------------------------------------------------------------ background dimmer

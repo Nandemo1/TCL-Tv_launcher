@@ -37,16 +37,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The home screen: clock, weather, a compact cricket scorecard widget, an editable
- * favourites row, a Spotify card and a single horizontal dock (All Apps, Wallpapers,
- * Play Store, Live TV, HDMI 1, HDMI 2). Every network call and package query runs on
- * the shared {@link Async} pool, never on the UI thread.
+ * The home screen: clock, weather, an editable favourites row, a Spotify card and a
+ * single horizontal dock (All Apps, Wallpapers, Play Store, Live TV, HDMI 1, HDMI 2).
+ * Every network call and package query runs on the shared {@link Async} pool, never on
+ * the UI thread.
  */
 public class HomeActivity extends Activity {
 
     private static final long WEATHER_MAX_AGE_MS = 30L * 60L * 1000L;
-    /** CricAPI's free tier allows 100 hits a day, so 5 minutes keeps a full day under it. */
-    private static final long CRICKET_REFRESH_MS = 5L * 60L * 1000L;
     private static final long NET_REFRESH_MS = 60L * 1000L;
     private static final String SPOTIFY_PACKAGE = "com.spotify.tv.android";
     private static final String PLAY_STORE_PACKAGE = "com.android.vending";
@@ -71,9 +69,6 @@ public class HomeActivity extends Activity {
     private TextView weatherTemp;
     private TextView weatherDesc;
     private TextView weatherCity;
-    private LinearLayout tickerRow;
-    private TextView tickerBadge;
-    private LinearLayout tickerChips;
     private TextView netDot;
     private TextView netText;
     private View spotifyCard;
@@ -90,13 +85,9 @@ public class HomeActivity extends Activity {
     private View liveTvTile;
 
     private String favouritesSignature;
-    private String lastCricketText;
     private final java.util.Map<String, Object[]> iconCache = new java.util.HashMap<>();
     private final java.util.concurrent.ExecutorService iconPool =
             java.util.concurrent.Executors.newFixedThreadPool(2);
-    private final java.util.concurrent.atomic.AtomicBoolean cricketFetching =
-            new java.util.concurrent.atomic.AtomicBoolean();
-    private long cricketBlockedUntil;
     private float tileScale = 1f;
     private int cornerDp = 16;
     private int movingFavourite = -1;
@@ -123,14 +114,6 @@ public class HomeActivity extends Activity {
         }
     };
 
-    private final Runnable cricketTick = new Runnable() {
-        @Override
-        public void run() {
-            refreshCricket();
-            ui.postDelayed(this, CRICKET_REFRESH_MS);
-        }
-    };
-
     private final Runnable netTick = new Runnable() {
         @Override
         public void run() {
@@ -143,7 +126,7 @@ public class HomeActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // The TV's DNS may hand out IPv6 addresses its router can't route; force IPv4 for
-        // all sockets so cricket/weather fetches don't die in connect timeouts.
+        // all sockets so weather fetches don't die in connect timeouts.
         System.setProperty("java.net.preferIPv4Stack", "true");
         prefs = new Prefs(this);
         tileScale = prefs.tileScale();
@@ -160,9 +143,6 @@ public class HomeActivity extends Activity {
         weatherTemp = findViewById(R.id.weatherTemp);
         weatherDesc = findViewById(R.id.weatherDesc);
         weatherCity = findViewById(R.id.weatherCity);
-        tickerRow = findViewById(R.id.tickerRow);
-        tickerBadge = findViewById(R.id.tickerBadge);
-        tickerChips = findViewById(R.id.tickerChips);
         netDot = findViewById(R.id.netDot);
         netText = findViewById(R.id.netText);
         spotifyCard = findViewById(R.id.spotifyCard);
@@ -185,7 +165,6 @@ public class HomeActivity extends Activity {
         buildFavourites();
         showCachedWeather();
         refreshWeather(false);
-        refreshCricket();
         refreshNet();
         restoreFocus();
     }
@@ -197,8 +176,6 @@ public class HomeActivity extends Activity {
         ui.post(clockTick);
         ui.removeCallbacks(weatherTick);
         ui.postDelayed(weatherTick, WEATHER_MAX_AGE_MS);
-        ui.removeCallbacks(cricketTick);
-        ui.post(cricketTick);
         ui.removeCallbacks(netTick);
         ui.post(netTick);
         refreshMediaSessions();
@@ -209,7 +186,6 @@ public class HomeActivity extends Activity {
         super.onStop();
         ui.removeCallbacks(clockTick);
         ui.removeCallbacks(weatherTick);
-        ui.removeCallbacks(cricketTick);
         ui.removeCallbacks(netTick);
         if (mediaController != null && mediaCallback != null) {
             mediaController.unregisterCallback(mediaCallback);
@@ -1095,127 +1071,6 @@ public class HomeActivity extends Activity {
         } catch (Exception e) {
             toast("Can't open Spotify");
         }
-    }
-
-    // ------------------------------------------------------------------ cricket widget
-
-    private void refreshCricket() {
-        if (!prefs.cricketOn()) {
-            ui.post(() -> {
-                if (!isFinishing() && !isDestroyed()) {
-                    tickerRow.setVisibility(View.GONE);
-                }
-            });
-            return;
-        }
-        if (System.currentTimeMillis() < cricketBlockedUntil) {
-            return; // daily quota exhausted; the chip already says so
-        }
-        if (!cricketFetching.compareAndSet(false, true)) {
-            return; // a fetch is already in flight; don't double-spend the quota
-        }
-        final int feed = prefs.cricketFeed();
-        Async.NET.execute(() -> {
-            try {
-                List<Cricket.Match> matches = feed == 0
-                        ? Cricket.fetchLive()
-                        : Cricket.fetchAll();
-                ui.post(() -> {
-                    if (isFinishing() || isDestroyed()) {
-                        return;
-                    }
-                    String text = cricketWidgetText(matches);
-                    if (text.equals(lastCricketText)) {
-                        return;
-                    }
-                    lastCricketText = text;
-                    renderCricketWidget(matches);
-                });
-            } catch (Exception e) {
-                android.util.Log.e("TVHOME_CRICKET", "fetch failed", e);
-                String message = String.valueOf(e.getMessage()).toLowerCase(Locale.US);
-                boolean quota = message.contains("hit")
-                        || message.contains("blocked")
-                        || message.contains("limit");
-                if (quota) {
-                    cricketBlockedUntil = nextQuotaReset();
-                }
-                ui.post(() -> {
-                    if (isFinishing() || isDestroyed()) {
-                        return;
-                    }
-                    String state = quota ? "quota" : "error";
-                    if (state.equals(lastCricketText)) {
-                        return;
-                    }
-                    lastCricketText = state;
-                    renderCricketError(quota
-                            ? "Cricket daily limit reached — scores resume after midnight UTC"
-                            : "Cricket feed unavailable — check the network connection");
-                });
-            } finally {
-                cricketFetching.set(false);
-            }
-        });
-    }
-
-    /** CricAPI's free tier allows 100 hits a day; retry just after the next UTC midnight. */
-    private long nextQuotaReset() {
-        long now = System.currentTimeMillis();
-        return now - (now % 86400000L) + 86400000L + 5L * 60L * 1000L;
-    }
-
-    private String cricketWidgetText(List<Cricket.Match> matches) {
-        StringBuilder out = new StringBuilder();
-        for (Cricket.Match match : matches) {
-            out.append(match.chip).append('|').append(match.live).append(';');
-        }
-        return out.toString();
-    }
-
-    /** Up to two compact score chips: "PAK 180/4 (20)  vs  AUS 120/2 (14.2)  • LIVE". */
-    private void renderCricketWidget(List<Cricket.Match> matches) {
-        tickerRow.setVisibility(View.VISIBLE);
-        String badge = Cricket.badgeFor(matches);
-        tickerBadge.setText(badge);
-        tickerBadge.setTextColor(getColor("LIVE".equals(badge)
-                ? R.color.green : R.color.muted));
-        tickerChips.removeAllViews();
-        if (matches.isEmpty()) {
-            tickerChips.addView(cricketChip(
-                    "No international cricket right now — fixtures appear automatically", false));
-            return;
-        }
-        for (Cricket.Match match : matches) {
-            tickerChips.addView(cricketChip(
-                    match.chip + (match.live ? "  • LIVE" : ""), match.live));
-        }
-    }
-
-    private void renderCricketError(String message) {
-        tickerRow.setVisibility(View.VISIBLE);
-        tickerBadge.setText("CRICKET");
-        tickerBadge.setTextColor(getColor(R.color.muted));
-        tickerChips.removeAllViews();
-        tickerChips.addView(cricketChip(message, false));
-    }
-
-    private View cricketChip(String text, boolean live) {
-        TextView chip = new TextView(this);
-        chip.setText(text);
-        chip.setTextSize(12f);
-        chip.setSingleLine(true);
-        chip.setIncludeFontPadding(false);
-        chip.setGravity(Gravity.CENTER);
-        chip.setFocusable(false);
-        chip.setBackgroundResource(R.drawable.card_bg_sm);
-        chip.setTextColor(getColor(live ? R.color.green : R.color.text));
-        chip.setPadding(dp(14), dp(6), dp(14), dp(6));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.setMarginEnd(dp(10));
-        chip.setLayoutParams(params);
-        return chip;
     }
 
     // ------------------------------------------------------------------ network health
