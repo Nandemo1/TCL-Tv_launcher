@@ -103,6 +103,12 @@
             android:exported="false"
             android:screenOrientation="landscape" />
 
+        <activity
+            android:name=".CitySearchActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".MediaListenerService"
             android:exported="true"

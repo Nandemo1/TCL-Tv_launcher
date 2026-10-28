@@ -1,13 +1,17 @@
 package com.tvhome.launcher;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.URLEncoder;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /** Current conditions from Open-Meteo (no key, no tracking). */
@@ -17,6 +21,80 @@ public final class Weather {
     public String desc = "—";
     public String detail = "";
     public int icon = R.drawable.w_na;
+
+    /** A geocoding hit: a place name plus the coordinates the forecast call needs. */
+    public static final class Place {
+        public final String name;
+        public final String region;
+        public final String country;
+        public final float lat;
+        public final float lon;
+
+        Place(String name, String region, String country, float lat, float lon) {
+            this.name = name;
+            this.region = region;
+            this.country = country;
+            this.lat = lat;
+            this.lon = lon;
+        }
+
+        /** "Springfield, Illinois, United States", so same-name towns stay tellable apart. */
+        public String label() {
+            StringBuilder out = new StringBuilder(name);
+            if (region != null && region.length() > 0) {
+                out.append(", ").append(region);
+            }
+            if (country != null && country.length() > 0) {
+                out.append(", ").append(country);
+            }
+            return out.toString();
+        }
+    }
+
+    /** Open-Meteo's free geocoder: no key and no account, and it covers the whole world. */
+    public static List<Place> geocode(String query) throws IOException, JSONException {
+        List<Place> places = new ArrayList<>();
+        String trimmed = query == null ? "" : query.trim();
+        if (trimmed.length() == 0) {
+            return places;
+        }
+        String url = "https://geocoding-api.open-meteo.com/v1/search?name="
+                + URLEncoder.encode(trimmed, "UTF-8") + "&count=20&language=en&format=json";
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        conn.setConnectTimeout(9000);
+        conn.setReadTimeout(9000);
+        conn.setRequestProperty("User-Agent", "tvhome/1.0");
+        String body;
+        try (InputStream in = conn.getInputStream()) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int read;
+            while ((read = in.read(buffer)) > 0) {
+                out.write(buffer, 0, read);
+            }
+            body = out.toString("UTF-8");
+        } finally {
+            conn.disconnect();
+        }
+
+        JSONArray results = new JSONObject(body).optJSONArray("results");
+        if (results == null) {
+            return places;
+        }
+        for (int i = 0; i < results.length(); i++) {
+            JSONObject item = results.optJSONObject(i);
+            if (item == null || item.optString("name", "").length() == 0) {
+                continue;
+            }
+            places.add(new Place(
+                    item.optString("name", ""),
+                    item.optString("admin1", ""),
+                    item.optString("country", ""),
+                    (float) item.optDouble("latitude", 0.0),
+                    (float) item.optDouble("longitude", 0.0)));
+        }
+        return places;
+    }
 
     public static String fetch(float lat, float lon) throws IOException {
         String url = String.format(Locale.US,

@@ -1,0 +1,5 @@
+{
+  "javaHome": "C:\\tools\\tv-tools\\dl\\jdk\\jdk-17",
+  "androidJar": "C:\\tools\\tv-tools\\dl\\platform30\\android-11\\android.jar",
+  "buildTools": "C:\\tools\\tv-tools\\dl\\buildtools\\android-14"
+}

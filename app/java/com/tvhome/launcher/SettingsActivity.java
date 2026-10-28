@@ -87,6 +87,13 @@ public class SettingsActivity extends Activity {
         Ui.zoom(system);
         system.setOnClickListener(v -> openSystemSettings());
 
+        TextView citySearch = findViewById(R.id.btnCitySearch);
+        Ui.zoom(citySearch);
+        citySearch.setOnClickListener(v -> {
+            startActivity(new Intent(this, CitySearchActivity.class));
+            overridePendingTransition(0, 0);
+        });
+
         TextView info = findViewById(R.id.info);
         info.setText("TV Home 1.0\n\n"
                 + "Wallpaper folder: /sdcard/" + WallpaperStore.USER_DIR + "\n"
@@ -96,6 +103,7 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        buildCities();
         updateNetStatus();
         restoreSettingsFocus();
     }
