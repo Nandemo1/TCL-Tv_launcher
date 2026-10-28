@@ -1,0 +1,12 @@
+# Build outputs & caches
+build/
+__pycache__/
+*.pyc
+
+# Signing keys (build.py regenerates on first run)
+*.keystore
+*.jks
+
+# OS junk
+Thumbs.db
+.DS_Store
