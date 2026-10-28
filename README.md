@@ -86,7 +86,7 @@ network switch, so turn that on if you see it.
 Download [platform-tools](https://developer.android.com/tools/releases/platform-tools) from Google,
 unzip it, open a terminal in that folder, then:
 
-    adb connect 192.168.1.50:5555
+    adb connect 192.168.100.:5555
 
 Use your TV's address, not mine.
 
